@@ -28,7 +28,6 @@ import javax.swing.JOptionPane;
 
 public class Order extends JFrame {
 
-    // Database connection parameters
     private static final String DB_URL = "jdbc:mysql://localhost:3306/inventory";
     private static final String USER = "root";
     private static final String PASSWORD = "1234";
@@ -36,26 +35,19 @@ public class Order extends JFrame {
     private static final long serialVersionUID = 1L;
     private JPanel contentPane;
     private JTable table;
-    private JTextField textField_1; // For Item Name
-    private JTextField textField_3; // For Quantity
-    private JTextField textField_4; // For Price
+    private JTextField textField_1; 
+    private JTextField textField_3; 
+    private JTextField textField_4; 
 
-    // Track current view
     private String currentView = "order";
 
-    // Declare comboBox and dateChooser as instance variables
     private JComboBox<String> comboBox;
     private JDateChooser dateChooser;
 
-    // Activity linked list
     private ActivityLinkedList activityList;
 
-    // Stock queue for handling stock operations
     private StockQueue stockQueue;
 
-    /**
-     * Launch the application.
-     */
     public static void main(String[] args) {
         EventQueue.invokeLater(() -> {
             try {
@@ -70,9 +62,7 @@ public class Order extends JFrame {
     public static Connection connectToDatabase() {
         Connection connection = null;
         try {
-            // Load the MySQL JDBC driver
             Class.forName("com.mysql.cj.jdbc.Driver");
-            // Establish the connection
             connection = DriverManager.getConnection(DB_URL, USER, PASSWORD);
         } catch (SQLException | ClassNotFoundException e) {
             e.printStackTrace();
@@ -86,14 +76,14 @@ public class Order extends JFrame {
             String query = "SELECT * FROM data WHERE status IN ('active', 'shipped')";
             try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
                 DefaultTableModel model = (DefaultTableModel) table.getModel();
-                model.setRowCount(0); // Clear existing rows
+                model.setRowCount(0); 
                 while (rs.next()) {
                     model.addRow(new Object[]{
                         rs.getInt("OrderID"),
                         rs.getString("ItemName"),
                         rs.getDate("Date"),
                         rs.getInt("Quantity"),
-                        formatPrice(rs.getDouble("Price")), // Format price with currency
+                        formatPrice(rs.getDouble("Price")), 
                         rs.getString("Category"),
                         rs.getString("Activity")
                     });
@@ -107,55 +97,49 @@ public class Order extends JFrame {
     }
 
     public void insertOrder() {
-        // Validate input fields
         if (textField_3.getText().isEmpty() || textField_4.getText().isEmpty() || dateChooser.getDate() == null) {
             JOptionPane.showMessageDialog(this, "Please fill in all fields.", "Input Error", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
         try {
-            int orderId = getNextOrderID(); // Get the next OrderID
+            int orderId = getNextOrderID(); 
             String itemName = textField_1.getText();
             int quantity = Integer.parseInt(textField_3.getText());
             double price = Double.parseDouble(textField_4.getText());
 
-            // Check if Quantity and Price are greater than 0
             if (quantity <= 0 || price <= 0) {
                 JOptionPane.showMessageDialog(this, "Quantity and Price must be greater than 0.", "Input Error", JOptionPane.WARNING_MESSAGE);
                 return;
             }
 
             String category = (String) comboBox.getSelectedItem();
-            String activity = "Stored"; // Set activity to "Stored"
-
+            String activity = "Stored"; 
             Connection connection = connectToDatabase();
             if (connection != null) {
                 String query = "INSERT INTO data (OrderID, ItemName, Date, Quantity, Price, Category, Activity) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
                 try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-                    pstmt.setInt(1, orderId); // OrderID
-                    pstmt.setString(2, itemName); // Item Name
-                    pstmt.setDate(3, new java.sql.Date(dateChooser.getDate().getTime())); // Order Date
-                    pstmt.setInt(4, quantity); // Quantity
-                    pstmt.setDouble(5, price); // Price
-                    pstmt.setString(6, category); // Category
-                    pstmt.setString(7, activity); // Activity - set to "Stored"
+                    pstmt.setInt(1, orderId); 
+                    pstmt.setString(2, itemName);
+                    pstmt.setDate(3, new java.sql.Date(dateChooser.getDate().getTime()));
+                    pstmt.setInt(4, quantity);
+                    pstmt.setDouble(5, price); 
+                    pstmt.setString(6, category); 
+                    pstmt.setString(7, activity); 
 
                     pstmt.executeUpdate();
                     JOptionPane.showMessageDialog(this, "Order inserted!", "Success", JOptionPane.INFORMATION_MESSAGE);
                     activityList.addActivity("Order Created", orderId);
-                    activityList.addActivity("Order Stored", orderId); // Log activity
+                    activityList.addActivity("Order Stored", orderId); 
 
-                    // Enqueue the stock operation
                     stockQueue.enqueue(new StockOperation("add", quantity, orderId));
 
-                    loadDataIntoTable(); // Refresh the table data
+                    loadDataIntoTable(); 
 
-                    // Display activities only in console
                     String activities = activityList.displayActivities(orderId);
-                    System.out.println(activities); // Log in console
+                    System.out.println(activities); 
 
-                    // Clear fields after successful order
                     clearFields();
                 } catch (SQLException e) {
                     JOptionPane.showMessageDialog(this, "Error inserting order: " + e.getMessage(), "Database Error", JOptionPane.ERROR_MESSAGE);
@@ -171,22 +155,22 @@ public class Order extends JFrame {
     }
 
     private void clearFields() {
-        textField_1.setText(""); // Clear Item Name field
-        textField_3.setText(""); // Clear Quantity field
-        textField_4.setText(""); // Clear Price field
-        comboBox.setSelectedIndex(0); // Reset Category combo box
-        dateChooser.setDate(null); // Reset date chooser
+        textField_1.setText(""); 
+        textField_3.setText(""); 
+        textField_4.setText(""); 
+        comboBox.setSelectedIndex(0); 
+        dateChooser.setDate(null);
     }
 
     private int getNextOrderID() {
         Connection connection = connectToDatabase();
-        int nextOrderID = 1; // Default value if no orders exist
+        int nextOrderID = 1; 
         if (connection != null) {
-            String query = "SELECT MAX(OrderID) AS maxId FROM data"; // Change 'data' to your actual table name
+            String query = "SELECT MAX(OrderID) AS maxId FROM data";
             try (Statement stmt = connection.createStatement();
                  ResultSet rs = stmt.executeQuery(query)) {
                 if (rs.next()) {
-                    nextOrderID = rs.getInt("maxId") + 1; // Increment max ID by 1
+                    nextOrderID = rs.getInt("maxId") + 1; 
                 }
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -198,13 +182,10 @@ public class Order extends JFrame {
     }
 
     private String formatPrice(double price) {
-        DecimalFormat df = new DecimalFormat("₱#,##0.00"); // Format to Peso currency
+        DecimalFormat df = new DecimalFormat("₱#,##0.00"); 
         return df.format(price);
     }
 
-    /**
-     * Create the frame.
-     */
     public Order() {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setBounds(100, 100, 1024, 768);
@@ -214,7 +195,6 @@ public class Order extends JFrame {
         setContentPane(contentPane);
         contentPane.setLayout(null);
 
-        // Load custom font
         Font garetFont = null;
         try {
             garetFont = Font.createFont(Font.TRUETYPE_FONT, new File("C:\\Users\\setht\\Documents\\Data Structure\\InventoryManagementSystem\\src\\inventorymanagementsystem\\resources\\fonts\\Garet\\Garet-Book.ttf"));
@@ -234,7 +214,6 @@ public class Order extends JFrame {
         lblNewLabel.setBounds(0, 11, 250, 180);
         panel.add(lblNewLabel);
 
-        // Add buttons with icons
         JButton btnDashboard = new JButton("Dashboard");
         btnDashboard.setIcon(new ImageIcon("C:\\Users\\setht\\Documents\\Data Structure\\InventoryManagementSystem\\src\\inventorymanagementsystem\\resources\\images\\Dashboard.png"));
         btnDashboard.setBounds(29, 217, 191, 60);
@@ -275,28 +254,24 @@ public class Order extends JFrame {
         scrollPane.setBounds(249, 79, 759, 300);
         contentPane.add(scrollPane);
 
-        // Initialize JTable
         table = new JTable() {
             private static final long serialVersionUID = 1L;
 
-            // Override to make the table non-editable
             @Override
             public boolean isCellEditable(int row, int column) {
-                return false; // All cells are non-editable
+                return false; 
             }
         };
 
-        table.getTableHeader().setReorderingAllowed(false);  // Disable column reordering
-        table.getTableHeader().setResizingAllowed(false);    // Disable column resizing
+        table.getTableHeader().setReorderingAllowed(false); 
+        table.getTableHeader().setResizingAllowed(false);    
 
-        // Disable column resizing
         for (int i = 0; i < table.getColumnModel().getColumnCount(); i++) {
             table.getColumnModel().getColumn(i).setResizable(false);
         }
 
         scrollPane.setViewportView(table);
 
-        // Set the table model
         table.setModel(new DefaultTableModel(
             new Object[][] {},
             new String[] { "OrderID", "Item Name", "Date", "Stock", "Price", "Category", "Activity" }
@@ -330,11 +305,9 @@ public class Order extends JFrame {
         table.getColumnModel().getColumn(6).setMinWidth(120);
         table.getColumnModel().getColumn(6).setMaxWidth(120);
 
-        // Center-align the table cells
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(JLabel.CENTER);
 
-        // Apply the renderer to all columns
         for (int i = 0; i < table.getColumnCount(); i++) {
             table.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
         }
@@ -366,17 +339,16 @@ public class Order extends JFrame {
 
         textField_1 = new JTextField();
         textField_1.setBounds(361, 431, 140, 27);
-        contentPane.add(textField_1); // For Item Name
+        contentPane.add(textField_1);
 
         textField_3 = new JTextField();
         textField_3.setBounds(848, 429, 150, 30);
-        contentPane.add(textField_3); // For Quantity
+        contentPane.add(textField_3); 
 
         textField_4 = new JTextField();
         textField_4.setBounds(361, 469, 140, 27);
-        contentPane.add(textField_4); // For Price
+        contentPane.add(textField_4); 
 
-        // Initialize combo boxes
         comboBox = new JComboBox<>(new String[]{
             "Processor", "CPU Cooler", "Motherboard", "RAM",
             "Video Card", "Storage", "PC Casing", "Power Supply Unit", "Cooling"
@@ -384,12 +356,10 @@ public class Order extends JFrame {
         comboBox.setBounds(608, 468, 130, 28);
         contentPane.add(comboBox);
 
-        // Initialize date chooser
         dateChooser = new JDateChooser();
         dateChooser.setBounds(608, 434, 130, 27);
         contentPane.add(dateChooser);
 
-        // Buttons
         JButton btnOrderNow = new JButton("Order");
         btnOrderNow.setBounds(400, 548, 115, 36);
         contentPane.add(btnOrderNow);
@@ -424,72 +394,61 @@ public class Order extends JFrame {
         panel_1_1.setBounds(249, 650, 759, 79);
         contentPane.add(panel_1_1);
 
-        // Initialize the activity linked list
         activityList = new ActivityLinkedList();
 
-        // Initialize the stock queue
-        stockQueue = new StockQueue(); // Initialize the stock queue
+        stockQueue = new StockQueue(); 
 
-        // Action Listeners for Navigation Buttons
         btnDashboard.addActionListener(e -> navigateTo("dashboard"));
         btnOrder.addActionListener(e -> navigateTo("order"));
         btnInventory.addActionListener(e -> navigateTo("inventory"));
         btnTracking.addActionListener(e -> navigateTo("tracking"));
         btnReport.addActionListener(e -> navigateTo("report")); 
         
-        // Order Now button functionality
         btnOrderNow.addActionListener(e -> insertOrder());
 
-        // Update button functionality
         btnUpdate.addActionListener(e -> loadDataIntoTable());
 
-        // Clear button functionality
         btnCancel.addActionListener(e -> clearFields());
 
-        // Remove button functionality
         btnRemove.addActionListener(e -> {
-            int selectedRow = table.getSelectedRow(); // Get selected row index
-            if (selectedRow >= 0) { // Check if a row is selected
-                int orderId = (int) table.getValueAt(selectedRow, 0); // Assuming OrderID is in the first column
-                removeOrder(orderId); // Call removeOrder with selected OrderID
+            int selectedRow = table.getSelectedRow(); 
+            if (selectedRow >= 0) { 
+                int orderId = (int) table.getValueAt(selectedRow, 0); 
+                removeOrder(orderId); 
             } else {
                 JOptionPane.showMessageDialog(Order.this, "Please select an order to remove.", "Selection Error", JOptionPane.WARNING_MESSAGE);
             }
         });
 
-        // Ship button functionality
         btnShip.addActionListener(e -> {
-            int selectedRow = table.getSelectedRow(); // Get selected row index
-            if (selectedRow >= 0) { // Check if a row is selected
-                int orderId = (int) table.getValueAt(selectedRow, 0); // Assuming OrderID is in the first column
-                int currentQuantity = (int) table.getValueAt(selectedRow, 3); // Get current quantity
-                double currentPrice = Double.parseDouble(((String) table.getValueAt(selectedRow, 4)).replace("₱", "").replace(",", "").trim()); // Get the price
+            int selectedRow = table.getSelectedRow(); 
+            if (selectedRow >= 0) {
+                int orderId = (int) table.getValueAt(selectedRow, 0); 
+                int currentQuantity = (int) table.getValueAt(selectedRow, 3);
+                double currentPrice = Double.parseDouble(((String) table.getValueAt(selectedRow, 4)).replace("₱", "").replace(",", "").trim()); 
 
-                // Check if the item is already shipped
                 String activity = (String) table.getValueAt(selectedRow, 6);
                 if ("Shipped".equals(activity)) {
                     JOptionPane.showMessageDialog(Order.this, "Cannot ship an order that is already shipped.", "Shipping Error", JOptionPane.WARNING_MESSAGE);
-                    return; // Exit the method without proceeding with shipping
+                    return; 
                 }
 
-                // Prompt for the amount to ship
                 String inputQuantity = JOptionPane.showInputDialog(Order.this, "Enter the quantity to ship:");
                 if (inputQuantity != null) {
                     try {
                         int amountToShip = Integer.parseInt(inputQuantity);
-                        // Check if the amount to ship is valid
+   
                         if (amountToShip <= 0) {
                             JOptionPane.showMessageDialog(Order.this, "Please enter a valid quantity.", "Input Error", JOptionPane.WARNING_MESSAGE);
                         } else if (amountToShip > currentQuantity) {
                             JOptionPane.showMessageDialog(Order.this, "Cannot ship more than the current quantity.", "Input Error", JOptionPane.WARNING_MESSAGE);
                         } else {
-                            // Prompt for the new price for the shipped order
+                          
                             String inputPrice = JOptionPane.showInputDialog(Order.this, "Enter the new price for the shipped order:");
                             if (inputPrice != null) {
                                 try {
                                     double newPrice = Double.parseDouble(inputPrice);
 
-                                    // Call the method to create a shipped order with the new price and current price
                                     createShippedOrder(orderId, amountToShip, currentQuantity, newPrice, currentPrice);
                                 } catch (NumberFormatException ex) {
                                     JOptionPane.showMessageDialog(Order.this, "Invalid input. Please enter a valid number for price.", "Input Error", JOptionPane.WARNING_MESSAGE);
@@ -505,29 +464,27 @@ public class Order extends JFrame {
             }
         });
 
-        // Restock button functionality
         btnRestock.addActionListener(e -> {
-            int selectedRow = table.getSelectedRow(); // Get selected row index
-            if (selectedRow >= 0) { // Check if a row is selected
-                int orderId = (int) table.getValueAt(selectedRow, 0); // Assuming OrderID is in the first column
-                String activity = (String) table.getValueAt(selectedRow, 6); // Assuming Activity is in the seventh column (index 6)
+            int selectedRow = table.getSelectedRow();
+            if (selectedRow >= 0) { 
+                int orderId = (int) table.getValueAt(selectedRow, 0); 
+                String activity = (String) table.getValueAt(selectedRow, 6); 
 
                 if ("Shipped".equals(activity)) {
-                    // Display an error message if the item is already shipped
+  
                     JOptionPane.showMessageDialog(Order.this, "Cannot restock an order that is already shipped.", "Restock Error", JOptionPane.WARNING_MESSAGE);
-                    return; // Exit the method without proceeding with restock
+                    return;
                 }
 
-                // Ask for the quantity to restock
                 String quantityInput = JOptionPane.showInputDialog(Order.this, "Enter the quantity to restock:");
                 if (quantityInput != null) {
                     try {
                         int amountToRestock = Integer.parseInt(quantityInput);
-                        // Check if the amount to restock is valid (greater than 0)
+                       
                         if (amountToRestock <= 0) {
                             JOptionPane.showMessageDialog(Order.this, "Please enter a valid quantity greater than 0.", "Input Error", JOptionPane.WARNING_MESSAGE);
                         } else {
-                            // Ask for the price increase
+                       
                             String priceInput = JOptionPane.showInputDialog(Order.this, "Enter the price increase:");
                             if (priceInput != null) {
                                 try {
@@ -535,7 +492,7 @@ public class Order extends JFrame {
                                     if (priceIncrease < 0) {
                                         JOptionPane.showMessageDialog(Order.this, "Please enter a valid price increase (greater than or equal to 0).", "Input Error", JOptionPane.WARNING_MESSAGE);
                                     } else {
-                                        // Restock the item in the database with the price increase
+                                       
                                         restockOrder(orderId, amountToRestock, priceIncrease);
                                     }
                                 } catch (NumberFormatException ex) {
@@ -552,28 +509,27 @@ public class Order extends JFrame {
             }
         });
 
-        // Load data into the table upon launch
         loadDataIntoTable();
     }
     
     private void navigateTo(String view) {
         if (!currentView.equals(view)) {
-            dispose(); // Close the current frame
+            dispose(); 
             switch (view) {
                 case "dashboard":
-                    new Dashboard().setVisible(true); // Open Dashboard
+                    new Dashboard().setVisible(true);
                     break;
                 case "order":
-                    new Order().setVisible(true); // Open Order
+                    new Order().setVisible(true); 
                     break;
                 case "inventory":
-                    new Inventory().setVisible(true); // Open Inventory
+                    new Inventory().setVisible(true); 
                     break;
                 case "tracking":
-                    new Tracking().setVisible(true); // Open Tracking
+                    new Tracking().setVisible(true); 
                     break;
                 case "report":
-                    new Report().setVisible(true); // Open Report
+                    new Report().setVisible(true); 
                     break;
                 default:
                     JOptionPane.showMessageDialog(this, "Unknown view: " + view, "Error", JOptionPane.ERROR_MESSAGE);
@@ -598,45 +554,44 @@ public class Order extends JFrame {
 
                 if (!isFullShipment && newPrice <= 0) {
                     JOptionPane.showMessageDialog(this, "Price must be greater than 0.", "Input Error", JOptionPane.WARNING_MESSAGE);
-                    return; // Exit the method if price is invalid
+                    return; 
                 }
 
                 if (!isFullShipment && newPrice == currentPrice) {
                     JOptionPane.showMessageDialog(this, "New price cannot be the same as the current price unless shipping all items.", "Input Error", JOptionPane.WARNING_MESSAGE);
-                    return; // Exit the method if the new price is invalid
+                    return; 
                 }
 
-                insertPstmt.setInt(1, getNextOrderID()); // New OrderID
-                insertPstmt.setDate(2, new java.sql.Date(new java.util.Date().getTime())); // Today's date
-                insertPstmt.setInt(3, amountShipped); // Quantity to ship
-                insertPstmt.setDouble(4, isFullShipment ? currentPrice : newPrice); // Set price based on full shipment
-                insertPstmt.setInt(5, orderId); // Original OrderID
+                insertPstmt.setInt(1, getNextOrderID());
+                insertPstmt.setDate(2, new java.sql.Date(new java.util.Date().getTime())); 
+                insertPstmt.setInt(3, amountShipped); 
+                insertPstmt.setDouble(4, isFullShipment ? currentPrice : newPrice);
+                insertPstmt.setInt(5, orderId); 
                 insertPstmt.executeUpdate();
 
                 if (isFullShipment) {
-                    deletePstmt.setInt(1, orderId); // Original OrderID
+                    deletePstmt.setInt(1, orderId);
                     deletePstmt.executeUpdate();
                     JOptionPane.showMessageDialog(this, "Order shipped and original order removed!", "Success", JOptionPane.INFORMATION_MESSAGE);
                     activityList.addActivity("Order Created", orderId);
                     activityList.addActivity("Order Updated", orderId);
-                    activityList.addActivity("Order Shipped", orderId); // Log activity
+                    activityList.addActivity("Order Shipped", orderId); 
 
                 } else {
-                    updatePstmt.setInt(1, amountShipped); // Subtract the quantity for the original order
-                    updatePstmt.setDouble(2, currentPrice - newPrice); // Adjust price for the remaining order
-                    updatePstmt.setInt(3, orderId); // Original OrderID
+                    updatePstmt.setInt(1, amountShipped); 
+                    updatePstmt.setDouble(2, currentPrice - newPrice); 
+                    updatePstmt.setInt(3, orderId); 
                     updatePstmt.executeUpdate();
                     JOptionPane.showMessageDialog(this, "Order created for shipping!", "Success", JOptionPane.INFORMATION_MESSAGE);
                     activityList.addActivity("Order Created", orderId);
                     activityList.addActivity("Order Updated", orderId);
-                    activityList.addActivity("Partial Shipment Created for Order: " + orderId, orderId); // Log activity
+                    activityList.addActivity("Partial Shipment Created for Order: " + orderId, orderId); 
                 }
 
-                loadDataIntoTable(); // Refresh the table data
+                loadDataIntoTable();
 
-                // Display activities only in console
                 String activities = activityList.displayActivities(orderId);
-                System.out.println(activities); // Log in console
+                System.out.println(activities);
 
             } catch (SQLException e) {
                 JOptionPane.showMessageDialog(this, "Error creating shipping order: " + e.getMessage(), "Database Error", JOptionPane.ERROR_MESSAGE);
@@ -646,7 +601,6 @@ public class Order extends JFrame {
         }
     }
 
-    // Method to restock an order
     private void restockOrder(int orderId, int amountToRestock, double priceIncrease) {
         Connection connection = connectToDatabase();
         if (connection != null) {
@@ -664,27 +618,26 @@ public class Order extends JFrame {
                     double originalPrice = rs.getDouble("Price");
 
                     int newQuantity = originalQuantity + amountToRestock;
-                    double newPrice = originalPrice + priceIncrease; // Add the price increase
+                    double newPrice = originalPrice + priceIncrease; 
 
                     if (newPrice < originalPrice) {
                         JOptionPane.showMessageDialog(this, "New price cannot exceed the current price.", "Input Error", JOptionPane.WARNING_MESSAGE);
-                        return; // Exit the method if price is invalid
+                        return; 
                     }
 
-                    updatePstmt.setInt(1, newQuantity); // New quantity
-                    updatePstmt.setDouble(2, newPrice); // Updated price
-                    updatePstmt.setInt(3, orderId); // The same OrderID
+                    updatePstmt.setInt(1, newQuantity);
+                    updatePstmt.setDouble(2, newPrice); 
+                    updatePstmt.setInt(3, orderId); 
 
                     int rowsAffected = updatePstmt.executeUpdate();
                     if (rowsAffected > 0) {
                         JOptionPane.showMessageDialog(this, "Order restocked and price updated!", "Success", JOptionPane.INFORMATION_MESSAGE);
                         activityList.addActivity("Order Created", orderId);
-                        activityList.addActivity("Order Restocked", orderId); // Log activity
-                        loadDataIntoTable(); // Refresh the table data
-
-                        // Display activities only in console
+                        activityList.addActivity("Order Restocked", orderId); 
+                        loadDataIntoTable(); 
+                                            
                         String activities = activityList.displayActivities(orderId);
-                        System.out.println(activities); // Log in console
+                        System.out.println(activities); 
                     } else {
                         JOptionPane.showMessageDialog(this, "Order update failed.", "Update Error", JOptionPane.ERROR_MESSAGE);
                     }
@@ -699,7 +652,6 @@ public class Order extends JFrame {
         }
     }
 
-    // Confirmation dialog for removing an order
     public void removeOrder(int orderId) {
         int confirmation = JOptionPane.showConfirmDialog(this, "Are you sure you want to remove this order?", "Confirm Removal", JOptionPane.YES_NO_OPTION);
         if (confirmation == JOptionPane.YES_OPTION) {
@@ -711,12 +663,11 @@ public class Order extends JFrame {
                     int rowsAffected = pstmt.executeUpdate();
                     if (rowsAffected > 0) {
                         JOptionPane.showMessageDialog(this, "Order has been removed!", "Success", JOptionPane.INFORMATION_MESSAGE);
-                        activityList.addActivity("Order Removed: " + orderId, orderId); // Log activity
-                        loadDataIntoTable(); // Refresh the table data
-
-                        // Display activities only in console
+                        activityList.addActivity("Order Removed: " + orderId, orderId); 
+                        loadDataIntoTable(); 
+                     
                         String activities = activityList.displayActivities(orderId);
-                        System.out.println(activities); // Log in console
+                        System.out.println(activities);
                     } else {
                         JOptionPane.showMessageDialog(this, "Order not found.", "Error", JOptionPane.ERROR_MESSAGE);
                     }
